@@ -12,7 +12,12 @@ import SwiftData
 struct ToDoApp: App {
     var body: some Scene {
         WindowGroup {
-            HomeView()
+            let dependencies = AppDependencies.shared
+            let viewModel = HomeViewModel(
+                getTaskGroupsUseCase: dependencies.getTaskGroupsUseCase,
+                deleteTaskUseCase: dependencies.deleteTaskUseCase
+            )
+            HomeView(viewModel: viewModel)
         }
         .modelContainer(CoreDataService.shared.modelContainer)
     }

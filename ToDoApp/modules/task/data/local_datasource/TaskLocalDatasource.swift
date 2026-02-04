@@ -10,6 +10,7 @@ import SwiftData
 
 protocol TaskLocalDataSource {
     func getTasks() async throws -> [Task]
+    func getTaskGroups() async throws -> [TaskGroup]
     func createTask(_ task: Task) async throws -> Task
     func deleteTask(id: String) async throws
 }
@@ -29,6 +30,12 @@ final class TaskLocalDataSourceImpl: TaskLocalDataSource {
     @MainActor
     func getTasks() async throws -> [Task] {
         let descriptor = FetchDescriptor<Task>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
+        return try context.fetch(descriptor)
+    }
+    
+    @MainActor
+    func getTaskGroups() async throws -> [TaskGroup] {
+        let descriptor = FetchDescriptor<TaskGroup>()
         return try context.fetch(descriptor)
     }
     

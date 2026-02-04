@@ -11,13 +11,11 @@ import SwiftData
 struct AddTaskView: View {
     @Environment(\.dismiss) private var dismiss
     
-    let taskGroups: [TaskGroup]
+    @State private var viewModel: AddTaskViewModel
     
-    @State private var title = ""
-    @State private var details = ""
-    @State private var selectedGroup: TaskGroup?
-    @State private var status: TaskStatus = .created
-    @State private var dueDate = Date()
+    init(viewModel: AddTaskViewModel) {
+        self.viewModel = viewModel
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -54,8 +52,8 @@ struct AddTaskView: View {
                             .foregroundColor(.gray)
                         
                         Menu {
-                            ForEach(taskGroups) { group in
-                                Button(action: { selectedGroup = group }) {
+                            ForEach(viewModel.taskGroups) { group in
+                                Button(action: { viewModel.selectedGroup = group }) {
                                     HStack {
                                         Image(systemName: group.iconName)
                                         Text(group.name)
@@ -64,7 +62,7 @@ struct AddTaskView: View {
                             }
                         } label: {
                             HStack {
-                                if let group = selectedGroup {
+                                if let group = viewModel.selectedGroup {
                                     Image(systemName: group.iconName)
                                         .foregroundColor(.blue)
                                     Text(group.name)
@@ -89,7 +87,7 @@ struct AddTaskView: View {
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.gray)
                         
-                        TextField("Enter task name", text: $title)
+                        TextField("Enter task name", text: $viewModel.title)
                             .padding()
                             .background(Color(UIColor.secondarySystemBackground))
                             .cornerRadius(12)
@@ -101,14 +99,14 @@ struct AddTaskView: View {
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.gray)
                         
-                        TextEditor(text: $details)
+                        TextEditor(text: $viewModel.details)
                             .frame(minHeight: 100)
                             .padding(8)
                             .background(Color(UIColor.secondarySystemBackground))
                             .cornerRadius(12)
                             .overlay(
                                 Group {
-                                    if details.isEmpty {
+                                    if viewModel.details.isEmpty {
                                         Text("This project is designed by team client. Our team responsible to implement user interface and conduct...")
                                             .foregroundColor(.gray)
                                             .padding(.horizontal, 12)
@@ -126,7 +124,7 @@ struct AddTaskView: View {
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.gray)
                         
-                        DatePicker("", selection: $dueDate, displayedComponents: [.date])
+                        DatePicker("", selection: $viewModel.dueDate, displayedComponents: [.date])
                             .datePickerStyle(.compact)
                             .labelsHidden()
                             .padding()
@@ -140,7 +138,7 @@ struct AddTaskView: View {
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.gray)
                         
-                        DatePicker("", selection: $dueDate, displayedComponents: [.date])
+                        DatePicker("", selection: $viewModel.dueDate, displayedComponents: [.date])
                             .datePickerStyle(.compact)
                             .labelsHidden()
                             .padding()
@@ -206,22 +204,19 @@ struct AddTaskView: View {
                     .cornerRadius(12)
             }
             .padding()
-            .disabled(title.isEmpty || selectedGroup == nil)
-            .opacity((title.isEmpty || selectedGroup == nil) ? 0.5 : 1)
+            .disabled(!viewModel.isValid)
+            .opacity(!viewModel.isValid ? 0.5 : 1)
         }
         .navigationBarHidden(true)
+        .onAppear {
+            Task {
+                await viewModel.fetchTaskGroups()
+            }
+        }
     }
     
     private func save() {
-        guard let group = selectedGroup else { return }
-        
-        let task = Task(title: title, details: details, status: status, dueDate: dueDate)
-        
-        if status == .doing {
-            task.startedAt = Date()
-        }
-        
-        group.tasks.append(task)
+        viewModel.save()
         dismiss()
     }
 }

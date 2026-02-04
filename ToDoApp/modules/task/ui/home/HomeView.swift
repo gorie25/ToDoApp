@@ -3,11 +3,11 @@ import SwiftData
 
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query var taskGroups: [TaskGroup]
+    @State private var viewModel: HomeViewModel
     
-    @State private var selectedDate = Date()
-    @State private var selectedFilter: TaskStatus? = nil
-    @State private var showAddTask = false
+    init(viewModel: HomeViewModel) {
+        self.viewModel = viewModel
+    }
     
     var body: some View {
         NavigationStack {
@@ -22,8 +22,8 @@ struct HomeView: View {
                         
                         Button(action: {}) {
                             Image(systemName: "bell.fill")
-                                .font(.title3)
-                                .foregroundColor(.primary)
+                            .font(.title3)
+                            .foregroundColor(.primary)
                         }
                     }
                     .padding()
@@ -37,13 +37,13 @@ struct HomeView: View {
                     // Filter Chips
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
-                            FilterChip(title: "All", isSelected: selectedFilter == nil) {
-                                selectedFilter = nil
+                            FilterChip(title: "All", isSelected: viewModel.selectedFilter == nil) {
+                                viewModel.selectedFilter = nil
                             }
                             
                             ForEach(TaskStatus.allCases, id: \.self) { status in
-                                FilterChip(title: status.title, isSelected: selectedFilter == status) {
-                                    selectedFilter = status
+                                FilterChip(title: status.title, isSelected: viewModel.selectedFilter == status) {
+                                    viewModel.selectedFilter = status
                                 }
                             }
                         }
@@ -52,16 +52,21 @@ struct HomeView: View {
                     .padding(.bottom, 12)
                     
                     // Task List
-                    if filteredTasks.isEmpty {
+                    let tasks = viewModel.filteredTasks(from: viewModel.taskGroups)
+                    if tasks.isEmpty {
                         emptyStateView
                     } else {
                         List {
-                            ForEach(filteredTasks) { task in
+                            ForEach(tasks) { task in
                                 TaskRowView(task: task)
                                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                                     .listRowBackground(Color.clear)
                             }
-                            .onDelete(perform: deleteTask)
+                            .onDelete { indexSet in
+                                Task {
+                                    await viewModel.deleteTask(at: indexSet, from: tasks, in: viewModel.taskGroups)
+                                }
+                            }
                         }
                         .listStyle(.plain)
                         .scrollContentBackground(.hidden)
@@ -73,7 +78,7 @@ struct HomeView: View {
                     Spacer()
                     HStack {
                         Spacer()
-                        Button(action: { showAddTask = true }) {
+                        Button(action: { viewModel.showAddTask = true }) {
                             Image(systemName: "plus")
                                 .font(.system(size: 24, weight: .semibold))
                                 .foregroundColor(.white)
@@ -94,24 +99,17 @@ struct HomeView: View {
                 }
             }
             .navigationBarHidden(true)
-            .sheet(isPresented: $showAddTask) {
+            .onAppear {
+                Task {
+                    await viewModel.fetchData()
+                }
+            }
+            .sheet(isPresented: $viewModel.showAddTask) {
                 NavigationStack {
-                    AddTaskView(taskGroups: taskGroups)
+                    AddTaskView(viewModel: AddTaskViewModel(getTaskGroupsUseCase: AppDependencies.shared.getTaskGroupsUseCase))
                 }
             }
         }
-    }
-    
-    private var filteredTasks: [Task] {
-        var allTasks: [Task] = []
-        for group in taskGroups {
-            allTasks.append(contentsOf: group.tasks)
-        }
-        
-        if let filter = selectedFilter {
-            return allTasks.filter { $0.status == filter }
-        }
-        return allTasks
     }
     
     private var emptyStateView: some View {
@@ -144,15 +142,15 @@ struct HomeView: View {
                     VStack(spacing: 8) {
                         Text(dayOfWeek(date))
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(isSameDay(date, selectedDate) ? .white : .gray)
+                            .foregroundColor(isSameDay(date, viewModel.selectedDate) ? .white : .gray)
                         
                         Text("\(calendar.component(.day, from: date))")
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(isSameDay(date, selectedDate) ? .white : .primary)
+                            .foregroundColor(isSameDay(date, viewModel.selectedDate) ? .white : .primary)
                     }
                     .frame(width: 50, height: 70)
                     .background(
-                        isSameDay(date, selectedDate) ?
+                        isSameDay(date, viewModel.selectedDate) ?
                         LinearGradient(
                             gradient: Gradient(colors: [Color.purple, Color.blue]),
                             startPoint: .topLeading,
@@ -166,7 +164,7 @@ struct HomeView: View {
                     )
                     .cornerRadius(16)
                     .onTapGesture {
-                        selectedDate = date
+                        viewModel.selectedDate = date
                     }
                 }
             }
@@ -182,21 +180,6 @@ struct HomeView: View {
     private func isSameDay(_ date1: Date, _ date2: Date) -> Bool {
         Calendar.current.isDate(date1, inSameDayAs: date2)
     }
-    
-    private func deleteTask(at offsets: IndexSet) {
-        let tasksToDelete = offsets.map { filteredTasks[$0] }
-        
-        for task in tasksToDelete {
-            // Find which group contains this task and remove it
-            for group in taskGroups {
-                if let index = group.tasks.firstIndex(where: { $0.id == task.id }) {
-                    group.tasks.remove(at: index)
-                    break
-                }
-            }
-        }
-    }
-}
 
 struct FilterChip: View {
     let title: String
@@ -226,6 +209,7 @@ struct FilterChip: View {
                 .cornerRadius(20)
         }
     }
+}
 }
 
 #Preview {
