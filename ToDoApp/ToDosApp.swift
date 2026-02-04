@@ -14,6 +14,6 @@ struct ToDoApp: App {
         WindowGroup {
             HomeView()
         }
-        .modelContainer(for: ReminderList.self)
+        .modelContainer(CoreDataService.shared.modelContainer)
     }
 }

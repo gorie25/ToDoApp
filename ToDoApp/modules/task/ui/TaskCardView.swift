@@ -1,5 +1,5 @@
 //
-//  ListCardView.swift
+//  TaskGroupCardView.swift
 //  ToDos
 //
 //  Created by TienTruong on 31/01/2025.
@@ -8,8 +8,8 @@
 import SwiftUI
 import SwiftData
 
-struct ListCardView: View {
-    @Bindable var reminderList: ReminderList
+struct TaskGroupCardView: View {
+    @Bindable var taskGroup: TaskGroup
     @State private var linkIsActive = false
     
     var body: some View {
@@ -18,13 +18,13 @@ struct ListCardView: View {
         } label: {
             VStack(alignment: .leading, spacing: 5) {
                 HStack {
-                    listIcon
+                    groupIcon
                     Spacer()
-                    Text("\(reminderList.reminder.count)")
+                    Text("\(taskGroup.tasks.count)")
                         .font(.system(.title, design: .rounded, weight: .bold))
                         .padding(.trailing)
                 }
-                Text(reminderList.name)
+                Text(taskGroup.name)
                     .font(.system(.body, design: .rounded, weight: .bold))
                     .foregroundColor(.secondary)
             }
@@ -35,33 +35,25 @@ struct ListCardView: View {
         }
         .overlay(
             NavigationLink(isActive: $linkIsActive,
-                           destination: { ReminderListView(reminderList: reminderList) },
+                           destination: { 
+                               TaskGroupListView(
+                                   taskGroup: taskGroup,
+                                   deleteTaskUseCase: AppDependencies.shared.deleteTaskUseCase
+                               )
+                           },
                            label: { EmptyView() }
                           ).opacity(0)
         ).buttonStyle(.plain)
     }
     
-    var listIcon: some View {
+    var groupIcon: some View {
         ZStack {
             Circle()
                 .frame(width: 27)
-            Image(systemName: reminderList.iconName)
+            Image(systemName: taskGroup.iconName)
                 .font(.footnote)
                 .foregroundColor(.white)
                 .bold()
         }
-    }
-}
-
-#Preview {
-    do {
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: ReminderList.self, configurations: config)
-        let example = ReminderList(name: "Today", iconName: "sun.max.fill", reminder: [Reminder(name: "Walk the dog")])
-        
-        return ListCardView(reminderList: example)
-            .modelContainer(container)
-    } catch {
-        fatalError("Failed to create a model container.")
     }
 }
